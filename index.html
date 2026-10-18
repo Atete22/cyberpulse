@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberPulse · start.ng</title>
+  <link rel="icon" href="./cover.png" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #060913;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #hud {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #1e293b;
+      border-radius: 12px 12px 0 0;
+    }
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .profile-card img {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid #38bdf8;
+      background: #1e293b;
+      display: none;
+    }
+    .player-meta { font-size: 13px; line-height: 1.2; }
+    .player-name { font-weight: 700; color: #f1f5f9; }
+    .player-handle { font-size: 11px; color: #94a3b8; }
+    .hud-stats {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid #38bdf8;
+      padding: 3px 7px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .action-btn {
+      border: none;
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .bomb-btn {
+      background: linear-gradient(135deg, #f43f5e, #ec4899);
+      color: #fff;
+      box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+    }
+    .shield-btn {
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      color: #fff;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+    .action-btn:hover { opacity: 0.9; }
+    .action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn {
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn:hover { background: #7dd3fc; }
+    #game-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 800px;
+      aspect-ratio: 16 / 10;
+      border: 1px solid #1e293b;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+      background: #090d16;
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(6, 9, 19, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 20px;
+      text-align: center;
+      z-index: 20;
+    }
+    #help-modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(6, 9, 19, 0.95);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px;
+      text-align: left;
+      z-index: 30;
+      max-width: 500px;
+      margin: auto;
+      border: 1px solid #38bdf8;
+      border-radius: 12px;
+    }
+    #level-popup {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(56, 189, 248, 0.95);
+      color: #0f172a;
+      padding: 6px 20px;
+      border-radius: 20px;
+      font-weight: 800;
+      font-size: 15px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.8);
+      z-index: 10;
+    }
+    #leaderboard-box {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 6px 10px;
+      width: 100%;
+      max-width: 360px;
+      font-size: 12px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .lb-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 4px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .lb-row.me {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="hud">
+    <div class="profile-card">
+      <img id="player-face" alt="Player avatar" />
+      <div class="player-meta">
+        <div class="player-name" id="player-name">Loading character...</div>
+        <div class="player-handle" id="player-handle">@guest</div>
+      </div>
+    </div>
+    <div class="hud-stats">
+      <span class="badge" id="level-badge">Lvl 1/30</span>
+      <div>Score: <span id="score-val">0</span></div>
+      <span class="badge" id="combo-badge" style="background:rgba(250,204,21,0.15); color:#facc15; border-color:#facc15;">Combo x1</span>
+      <button id="shield-btn" class="action-btn shield-btn" onclick="buyShield()" title="Cost: 40 pts">🛡️ Shield (40)</button>
+      <button id="bomb-btn" class="action-btn bomb-btn" onclick="triggerBomb()" title="Cost: 50 pts">💣 Bomb (50)</button>
+      <button id="signin-btn" class="btn" style="display:none; padding:4px 8px; font-size:11px;">Sign in</button>
+    </div>
+  </div>
+
+  <div id="game-wrap">
+    <div id="level-popup">Level Up!</div>
+    
+    <!-- Help Modal -->
+    <div id="help-modal">
+      <h2 style="color:#38bdf8; font-size:22px; margin-bottom:4px;">📖 How to Play & Features</h2>
+      <ul style="color:#cbd5e1; font-size:13px; line-height:1.5; padding-left:18px; display:flex; flex-direction:column; gap:6px;">
+        <li><strong>Movement:</strong> Use Arrow Keys, WASD, or Touch/Mouse to move your start.ng character.</li>
+        <li><strong>Relics & Levels:</strong> Collect glowing blue relics to gain score (+10 pts × Combo). Advance through <strong>30 Levels</strong> (every 20 pts). Background color and cyber grid animate and intensify per level!</li>
+        <li><strong>Combo Multiplier:</strong> Collecting relics consecutively builds your combo up to 5x.</li>
+        <li><strong>🛡️ Shield (40 pts):</strong> Press <strong>[Space]</strong> or click Shield to activate a protective energy aura that absorbs 1 fatal drone crash.</li>
+        <li><strong>💣 Bomb (50 pts):</strong> Press <strong>[B]</strong> or click Bomb to instantly detonate all active drones on screen!</li>
+      </ul>
+      <button class="btn" onclick="toggleHelp(false)" style="margin-top:10px; width:100%;">Got It! Back to Game</button>
+    </div>
+
+    <canvas id="canvas" width="800" height="500"></canvas>
+    
+    <div id="overlay">
+      <h1 style="font-size:24px; color:#38bdf8;">CyberPulse ⚡</h1>
+      <p style="color:#cbd5e1; font-size:12px; max-width:440px;">
+        30 Animated Levels • Combo Multipliers • Shield & Bomb Abilities!
+      </p>
+      <div id="leaderboard-box">Loading leaderboard...</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+        <button id="start-btn" class="btn">Play Now</button>
+        <button class="btn" style="background:#334155; color:#f8fafc;" onclick="toggleHelp(true)">❓ Help & Rules</button>
+        <button id="overlay-signin-btn" class="btn" style="display:none; background:#a855f7; color:#fff;">Sign In to Save Scores</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const START_NG = 'https://start.ng';
+    const connectFrame = document.createElement('iframe');
+    connectFrame.src = `${START_NG}/connect`;
+    connectFrame.style.display = 'none';
+    document.body.appendChild(connectFrame);
+
+    let frameReady = new Promise((resolve) => {
+      connectFrame.addEventListener('load', () => resolve(), { once: true });
+      setTimeout(resolve, 2000);
+    });
+
+    function askStartNg(payload, expectedType, timeoutMs = 3000) {
+      return new Promise(async (resolve) => {
+        await frameReady;
+        let done = false;
+        const timer = setTimeout(() => {
+          if (!done) { done = true; window.removeEventListener('message', onMsg); resolve(null); }
+        }, timeoutMs);
+
+        function onMsg(e) {
+          if (e.origin !== START_NG && e.origin !== location.origin) return;
+          if (e.data && (!expectedType || e.data.type === expectedType || e.data.user || e.data.guest || e.data.entries)) {
+            done = true;
+            clearTimeout(timer);
+            window.removeEventListener('message', onMsg);
+            resolve(e.data);
+          }
+        }
+        window.addEventListener('message', onMsg);
+        
+        try {
+          if (connectFrame.contentWindow) {
+            connectFrame.contentWindow.postMessage(payload, START_NG);
+          }
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(payload, START_NG);
+          }
+        } catch (err) {
+          console.error("Bridge error:", err);
+        }
+      });
+    }
+
+    function signInWithStartNg() {
+      location.href = `${START_NG}/?return_to=${encodeURIComponent(location.origin + location.pathname)}`;
+    }
+
+    document.getElementById('signin-btn').addEventListener('click', signInWithStartNg);
+    document.getElementById('overlay-signin-btn').addEventListener('click', signInWithStartNg);
+
+    function toggleHelp(show) {
+      document.getElementById('help-modal').style.display = show ? 'flex' : 'none';
+    }
+
+    let currentPlayer = {
+      id: null,
+      name: 'Guest',
+      account: 'guest',
+      isGuest: true,
+      face: null,
+      style: {
+        body: 'female',
+        primaryColor: '#38bdf8',
+        secondaryColor: '#a855f7',
+        skinColor: '#8d5524',
+        hairColor: '#1e293b',
+        hair: 'braids',
+        hat: 'none',
+        accessory: 'none'
+      }
+    };
+
+    const urlParams = new URLSearchParams(location.search);
+    const urlHasGuest = urlParams.has('guest');
+
+    async function initStartNg() {
+      const reply = await askStartNg({ type: 'startng:whoami' }, 'startng:user');
+      const raw = reply?.user ?? reply?.guest ?? reply;
+      const isSignedIn = Boolean(reply?.user || (raw && raw.id && !raw.isGuest));
+
+      if (raw && (raw.name || raw.account || raw.id)) {
+        currentPlayer = {
+          id: raw.id || null,
+          name: raw.name || (isSignedIn ? 'Player' : 'Guest'),
+          account: raw.account || (isSignedIn ? 'player' : 'guest'),
+          isGuest: !isSignedIn,
+          face: raw.face || null,
+          style: Object.assign({}, currentPlayer.style, raw.style || {})
+        };
+      }
+
+      document.getElementById('player-name').textContent = currentPlayer.name;
+      document.getElementById('player-handle').textContent = `@${currentPlayer.account}`;
+
+      if (currentPlayer.face) {
+        const img = document.getElementById('player-face');
+        img.src = currentPlayer.face;
+        img.style.display = 'block';
+      }
+
+      if (currentPlayer.isGuest) {
+        document.getElementById('signin-btn').style.display = 'inline-block';
+        if (!urlHasGuest) {
+          document.getElementById('overlay-signin-btn').style.display = 'inline-block';
+        }
+      }
+
+      await loadLeaderboard();
+    }
+
+    async function loadLeaderboard() {
+      const box = document.getElementById('leaderboard-box');
+      const board = await askStartNg({ type: 'startng:leaderboard', limit: 10 }, 'startng:leaderboardData');
+      const rows = board?.entries || board?.leaderboard || board?.rows || board || [];
+      if (!Array.isArray(rows) || !rows.length) {
+        box.innerHTML = '<div style="color:#94a3b8;">No runs recorded yet. Be the first on the board!</div>';
+        return;
+      }
+      box.innerHTML = rows.map((r, idx) => {
+        const isMe = currentPlayer.id && (r.player_id === currentPlayer.id || r.id === currentPlayer.id);
+        return `<div class="lb-row ${isMe ? 'me' : ''}">
+          <span>#${idx + 1} ${r.name || r.account || 'Player'}</span>
+          <span>${r.score ?? 0} pts</span>
+        </div>`;
+      }).join('');
+    }
+
+    function drawCharacter(ctx, x, y, style, hasShield) {
+      const s = style || currentPlayer.style;
+      ctx.save();
+      ctx.translate(x, y);
+
+      if (hasShield) {
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, -4, 28, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+        ctx.fill();
+      }
+
+      ctx.fillStyle = s.secondaryColor || '#a855f7';
+      ctx.fillRect(-10, 10, 8, 14);
+      ctx.fillRect(2, 10, 8, 14);
+
+      ctx.fillStyle = s.primaryColor || '#38bdf8';
+      ctx.beginPath();
+      if (s.body === 'female') {
+        ctx.moveTo(-11, -8);
+        ctx.lineTo(11, -8);
+        ctx.lineTo(14, 12);
+        ctx.lineTo(-14, 12);
+      } else {
+        ctx.rect(-13, -8, 26, 20);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = s.skinColor || '#c68642';
+      ctx.beginPath();
+      ctx.arc(0, -18, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-5, -20, 3, 3);
+      ctx.fillRect(2, -20, 3, 3);
+
+      if (s.hair && s.hair !== 'bald') {
+        ctx.fillStyle = s.hairColor || '#1e293b';
+        if (s.hair === 'afro') {
+          ctx.beginPath();
+          ctx.arc(0, -23, 16, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (s.hair === 'bun' || s.hair === 'ponytail') {
+          ctx.fillRect(-12, -30, 24, 7);
+          ctx.beginPath();
+          ctx.arc(s.hair === 'bun' ? 0 : 14, -33, 6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (s.hair === 'braids' || s.hair === 'dreads') {
+          ctx.fillRect(-12, -30, 24, 7);
+          ctx.fillRect(-14, -24, 4, 16);
+          ctx.fillRect(10, -24, 4, 16);
+        } else {
+          ctx.fillRect(-12, -30, 24, 8);
+        }
+      }
+
+      if (s.hat && s.hat !== 'none') {
+        if (s.hat === 'crown') {
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          ctx.moveTo(-12, -28);
+          ctx.lineTo(-12, -38);
+          ctx.lineTo(-5, -32);
+          ctx.lineTo(0, -40);
+          ctx.lineTo(5, -32);
+          ctx.lineTo(12, -38);
+          ctx.lineTo(12, -28);
+          ctx.closePath();
+          ctx.fill();
+        } else if (s.hat === 'tophat') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-16, -30, 32, 4);
+          ctx.fillRect(-10, -46, 20, 16);
+        } else {
+          ctx.fillStyle = s.primaryColor || '#ef4444';
+          ctx.fillRect(-13, -34, 26, 7);
+        }
+      }
+
+      if (s.accessory && s.accessory !== 'none') {
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-8, -22, 7, 5);
+        ctx.strokeRect(1, -22, 7, 5);
+      }
+
+      ctx.restore();
+    }
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let running = false;
+    let score = 0;
+    let level = 1;
+    let lastLevel = 1;
+    let combo = 1;
+    let shieldActive = false;
+    const hero = { x: 400, y: 250, speed: 5 };
+    const keys = {};
+    let pointer = null;
+    let relics = [];
+    let drones = [];
+    let particles = [];
+    let bgOffset = 0;
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.key.toLowerCase() === 'b') triggerBomb();
+      if (e.key === ' ') buyShield();
+    });
+    window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+    canvas.addEventListener('pointerdown', (e) => updatePointer(e));
+    canvas.addEventListener('pointermove', (e) => { if (e.buttons) updatePointer(e); });
+    canvas.addEventListener('pointerup', () => pointer = null);
+
+    function updatePointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      pointer = {
+        x: (e.clientX - rect.left) * (canvas.width / rect.width),
+        y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function buyShield() {
+      if (!running || score < 40 || shieldActive) return;
+      score -= 40;
+      shieldActive = true;
+      document.getElementById('score-val').textContent = score;
+      updateButtons();
+    }
+
+    function triggerBomb() {
+      if (!running || score < 50) return;
+      score -= 50;
+      document.getElementById('score-val').textContent = score;
+      
+      for (const d of drones) {
+        for (let i = 0; i < 8; i++) {
+          particles.push({
+            x: d.x, y: d.y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            color: '#f43f5e',
+            life: 30
+          });
+        }
+      }
+      drones = [];
+      updateButtons();
+    }
+
+    function updateButtons() {
+      document.getElementById('shield-btn').disabled = score < 40 || shieldActive;
+      document.getElementById('bomb-btn').disabled = score < 50;
+    }
+
+    function spawnRelic() {
+      relics.push({
+        x: 40 + Math.random() * (canvas.width - 80),
+        y: 40 + Math.random() * (canvas.height - 80),
+        r: 9
+      });
+    }
+
+    function spawnDrone() {
+      const edge = Math.floor(Math.random() * 4);
+      let x = edge === 0 ? 0 : edge === 1 ? canvas.width : Math.random() * canvas.width;
+      let y = edge === 2 ? 0 : edge === 3 ? canvas.height : Math.random() * canvas.height;
+      const angle = Math.atan2(hero.y - y, hero.x - x);
+      const baseSpd = 1.5 + (level * 0.32);
+      const spd = baseSpd + Math.min(score * 0.02, 3.0);
+      drones.push({ x, y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd, r: 9 + Math.min(Math.floor(level / 3), 4) });
+    }
+
+    function showLevelPopup(lvl) {
+      const popup = document.getElementById('level-popup');
+      popup.textContent = lvl === 30 ? '👑 LEVEL 30: ULTIMATE BOSS STAGE! 👑' : `✨ Level ${lvl} / 30 Reached! ✨`;
+      popup.style.opacity = '1';
+      setTimeout(() => {
+        popup.style.opacity = '0';
+      }, 1500);
+    }
+
+    function startGame() {
+      score = 0;
+      level = 1;
+      lastLevel = 1;
+      combo = 1;
+      shieldActive = false;
+      document.getElementById('score-val').textContent = '0';
+      document.getElementById('level-badge').textContent = 'Lvl 1/30';
+      document.getElementById('combo-badge').textContent = 'Combo x1';
+      updateButtons();
+      hero.x = 400; hero.y = 250;
+      relics = []; drones = []; particles = [];
+      for (let i = 0; i < 4; i++) spawnRelic();
+      running = true;
+      document.getElementById('overlay').style.display = 'none';
+      requestAnimationFrame(loop);
+    }
+
+    async function endGame() {
+      running = false;
+      document.getElementById('overlay').style.display = 'flex';
+      
+      if (score > 0) {
+        if (connectFrame.contentWindow) {
+          connectFrame.contentWindow.postMessage({ type: 'startng:score', score }, START_NG);
+        }
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'startng:score', score }, START_NG);
+        }
+      }
+      await loadLeaderboard();
+    }
+
+    let frame = 0;
+    function loop() {
+      if (!running) return;
+      frame++;
+      bgOffset += 0.5 + (level * 0.1);
+
+      level = Math.min(30, Math.floor(score / 20) + 1);
+      document.getElementById('level-badge').textContent = `Lvl ${level}/30`;
+
+      if (level > lastLevel) {
+        showLevelPopup(level);
+        lastLevel = level;
+      }
+
+      const hue = (level * 12 + frame * 0.1) % 360;
+      ctx.fillStyle = `hsl(${hue}, 40%, 6%)`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = `hsla(${hue}, 70%, 20%, 0.25)`;
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      const shift = bgOffset % gridSize;
+      for (let x = shift; x < canvas.width; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = shift; y < canvas.height; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      if (keys['arrowleft'] || keys['a']) hero.x -= hero.speed;
+      if (keys['arrowright'] || keys['d']) hero.x += hero.speed;
+      if (keys['arrowup'] || keys['w']) hero.y -= hero.speed;
+      if (keys['arrowdown'] || keys['s']) hero.y += hero.speed;
+      if (pointer) {
+        const dx = pointer.x - hero.x, dy = pointer.y - hero.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 4) { hero.x += (dx / d) * hero.speed; hero.y += (dy / d) * hero.speed; }
+      }
+      hero.x = Math.max(20, Math.min(canvas.width - 20, hero.x));
+      hero.y = Math.max(35, Math.min(canvas.height - 25, hero.y));
+
+      const spawnInterval = Math.max(20, 70 - (level - 1) * 1.6);
+      if (frame % Math.floor(spawnInterval) === 0) {
+        spawnDrone();
+        if (level >= 5) spawnDrone();
+      }
+
+      ctx.fillStyle = '#38bdf8';
+      relics = relics.filter((rel) => {
+        ctx.beginPath();
+        ctx.arc(rel.x, rel.y, rel.r, 0, Math.PI * 2);
+        ctx.fill();
+        if (Math.hypot(hero.x - rel.x, hero.y - rel.y) < 26) {
+          combo = Math.min(5, combo + 1);
+          score += 10 * combo;
+          document.getElementById('score-val').textContent = score;
+          document.getElementById('combo-badge').textContent = `Combo x${combo}`;
+          updateButtons();
+          spawnRelic();
+          return false;
+        }
+        return true;
+      });
+
+      particles = particles.filter(p => {
+        p.x += p.vx; p.y += p.vy; p.life--;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 4, 4);
+        return p.life > 0;
+      });
+
+      ctx.fillStyle = level >= 20 ? '#ec4899' : level >= 10 ? '#f59e0b' : '#f43f5e';
+      for (const d of drones) {
+        d.x += d.vx; d.y += d.vy;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+        if (Math.hypot(hero.x - d.x, hero.y - d.y) < 24) {
+          if (shieldActive) {
+            shieldActive = false;
+            drones = drones.filter(item => item !== d);
+            for (let i = 0; i < 10; i++) {
+              particles.push({
+                x: d.x, y: d.y,
+                vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+                color: '#38bdf8', life: 25
+              });
+            }
+            updateButtons();
+            break;
+          } else {
+            endGame();
+            return;
+          }
+        }
+      }
+
+      drawCharacter(ctx, hero.x, hero.y, currentPlayer.style, shieldActive);
+      requestAnimationFrame(loop);
+    }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    initStartNg();
+  </script>
+</body>
+</html>
